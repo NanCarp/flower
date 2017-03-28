@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="renderer" content="webkit|ie-comp|ie-stand">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+		<meta http-equiv="Cache-Control" content="no-siteapp" />
+		<meta name="format-detection" content="telephone=no" />
+		<link rel="stylesheet" type="text/css" href="/resource/H-ui.admin_v2.5/lib/Hui-iconfont/1.0.7/iconfont.css" />
+		<link rel="stylesheet" type="text/css" href="/resource/flower/css/flower.logistics.css" />
+		<style type="text/css">
+			body{background: url('/resource/flower/image/ecardbg.png') no-repeat; background-size: 375px 630px;font-family: Microsoft Yahei;font-size: 18px;}
+			.main{width: calc(100% - 30px);height:600px;float: left;padding: 15px 15px;}
+			.v_1{width: 100%; height: 220px;margin-top: 80px;}
+			.v_1 span:nth-child(1){width: calc(100% - 80px);height: 70px;float: left;padding: 20px 40px;line-height: 35px;}
+			.v_1 span:nth-child(2){width: calc(100% - 80px);height: 70px;float: left;text-align: right;padding: 20px 40px;}
+			.v_2{width: 100%; height: 200px;}
+			.v_2 span:nth-child(1){width: 40%;height: 130px;float: left;padding-top: 70px;}
+			.v_2 img{width: 120px; height: 120px;float: right;}
+			.v_2 span:nth-child(2){width: calc(100% - 163px);height: 130px;float: left;padding: 70px 15px 0 10px;}
+		</style>
+		<script type="text/javascript" src="/resource/flower/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/resource/layer/layer.js"></script>
+		<script type="text/javascript" src="/resource/flower/js/flower.js"></script>
+		<title>祝福卡</title>
+	</head>
+	<body>
+		<div class="container">
+			<div class="main">
+				<div class="v_1">
+					<span>${zhufu.zhufu!}</span>
+					<span>${zhufu.songhua!}</span>
+				</div>
+				<div class="v_2">
+					<span><img src="/resource/flower/image/huacode.png"></span>
+					<span>长按识别左侧二维码关注花美美公众号，查看配送详情及变更信息。</span>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

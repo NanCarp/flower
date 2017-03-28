@@ -1,0 +1,31 @@
+
+#local
+jdbcUrl = jdbc:mysql://localhost:3306/flower?characterEncoding=utf8&zeroDateTimeBehavior=convertToNull
+user = root
+password = 123456
+
+#yb
+#jdbcUrl = jdbc:mysql://192.168.2.20:3306/flower?characterEncoding=utf8&zeroDateTimeBehavior=convertToNull
+#user = root
+#password = root
+
+#jdbcUrl = jdbc:mysql://localhost:3306/flower?characterEncoding=utf8&zeroDateTimeBehavior=convertToNull
+#password = Mdm50169999
+
+host = http://www.flowermm.cn
+imgpath = D:/upload/flower/image/
+
+token = weixin
+encryptMessage = false
+
+#appId = wx8d159d0220b67384
+#appSecret = f7abb78c914e25fc70d4c0c8ca048bc9
+#encodingAesKey = nPRjhdOELYSxo9sWUMgNZOjLA47Z2DEAGe04IivJIz7
+#mchId = 1403445202
+#key = QHBBo65QoS63muFFulaDfFL2p2zaynlG
+
+appId = wx973d6545600e2372
+appSecret = 4d47a3107c83d66974ea85ec3898b9df
+encodingAesKey = 1NCsBkB6kzaP9qd4h7yJQiArTpJmfOltFM8lvgVf6IQ
+mchId = 1375468102
+key = 42e77b63637ab381e8be5f8318cc28ax

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="renderer" content="webkit|ie-comp|ie-stand">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+		<meta http-equiv="Cache-Control" content="no-siteapp" />
+		<meta name="format-detection" content="telephone=no" />
+		<link rel="stylesheet" type="text/css" href="/resource/flower/css/flower.css" />
+		<script type="text/javascript" src="/resource/flower/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/resource/layer_mobile/layer.js"></script>
+		<script type="text/javascript" src="http://res.wx.qq.com/open/js/jweixin-1.0.0.js"></script>
+		<title>订单支付</title>
+		<style type="text/css">
+			.detail_p{
+				width: 100%;
+			    height: 40px;
+			    float: left;
+			    line-height: 40px;
+    			color: #48505B;
+    			font-size: 14px;
+			    box-sizing: border-box;
+			    padding: 0 15px;
+			    margin: 0;
+			    border-bottom: 1px solid #EEE;
+			}
+			.detail_p i{
+				font: 14px/40px 'Microsoft Yahei';
+    			font-weight: bolder;
+			}
+			.detail_div{
+				width: 100%;
+				height: 100px;
+				float: left;
+				box-sizing: border-box;
+			    padding: 10px 15px;
+				border-bottom: 1px solid #EEE;
+			}
+			.pay_div{
+				width: 100%;
+				height: 50px;
+				float: left;
+				box-sizing: border-box;
+			    padding: 10px 15px;
+			}
+			.detail_div img{
+				width: 80px;
+				height: 80px;
+				float: left;
+			}
+			.detail_div p{
+				width: calc(100% - 90px);
+				height: 80px;
+				float: right;
+				margin: 0;
+			}
+			.detail_div p span{
+			    width: 100%;
+			    height: 30px;
+			    float: left;
+			    text-align: left;
+			    color: #48505B;
+			}
+			.detail_div p span i{
+			    float: right;
+			    font: 14px/30px 'Microsoft Yahei';
+			}
+		</style>
+		<script type="text/javascript">
+			$().ready(function(){
+				$.post('/weixin/configvalid', {'url':window.location.toString()}, function(data){
+					wx.config({
+					    debug: false,
+					    appId: data.appId,
+					    timestamp: data.timestamp,
+					    nonceStr: data.nonceStr,
+					    signature: data.signature,
+					    jsApiList: ['chooseWXPay']
+					});
+				});
+			});
+			wx.ready(function(){
+				wx.chooseWXPay({
+				    timestamp: '${payMap.timeStamp}',
+				    nonceStr: '${payMap.nonceStr}',
+				    package: '${payMap.package}',
+				    signType: 'MD5',
+				    paySign: '${payMap.paySign}',
+				    success: function () {
+				    	location.replace('/service/myorder');
+				    }
+				});
+			});
+		</script>
+	</head>
+	<body>
+		<div class="container">
+			<p class="detail_p"><i>订单编号:</i>${ordercode}</p>
+			<#list detaillist as detail>
+			<div class="detail_div">
+				<img src="${detail.imgurl}" />
+				<p>
+					<span>${detail.name}</span>
+					<span>&yen;${detail.price?string('0.00')}<i>x&nbsp;<#if detail.type==1>${detail.cycle}<#else>1</#if></i></span>
+				</p>
+			</div>
+			</#list>
+			<div class="pay_div">
+				<a style="width: 100%;height: 30px;float: left;font: 14px/30px 'Microsoft Yahei';text-align: right;">支付总额:&yen;${detaillist[0].totalprice?string('0.00')}</a>
+			</div>
+		</div>
+	</body>
+</html>

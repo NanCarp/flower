@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="renderer" content="webkit|ie-comp|ie-stand">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+		<meta http-equiv="Cache-Control" content="no-siteapp" />
+		<link rel="stylesheet" type="text/css" href="/resource/flower/css/flower.css" />
+		<script type="text/javascript" src="/resource/flower/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/resource/layer_mobile/layer.js"></script>
+		<script type="text/javascript" src="/resource/flower/js/flower.js"></script>
+		<title>会员中心</title>
+	</head>
+	<body>
+		<div class="container">
+			<div class="center_1">
+				<img src="/resource/flower/image/014.png" class="center_1_1" />
+				<div class="center_1_2">
+					<span>${account.nick!}</span>
+					<a class="center_1_2_l" href="/product/3"><img src="/resource/flower/image/icon/010.png"/><span>送花</span></a>
+					<a class="center_1_2_c"><img src="${account.headimg!}" style="border-radius:40px;"/></a>
+					<#if sign==0>
+					<a class="center_1_2_r" onclick="signin(this)" data-lock="0"><img src="/resource/flower/image/icon/009.png"/><span>签到</span></a>
+					<#else>
+					<a class="center_1_2_r"><img src="/resource/flower/image/icon/016.png"/><span>已签到</span></a>
+					</#if>
+				</div>
+				<div class="center_1_3">
+					<div class="center_a" onclick="location.href='/service/myorder/1'"><span>${ordercount[0]}</span><span>待付款</span></div>
+					<div class="center_a" onclick="location.href='/service/myorder/1-1'"><span>${ordercount[1]}</span><span>服务中</span></div>
+					<div class="center_a" onclick="location.href='/service/myorder/1-3'"><span>${ordercount[2]}</span><span>已完成</span></div>
+				</div>
+				<div class="center_1_4 cbg">
+					<a href="/service/myorder"><img src="/resource/flower/image/icon/001.png" /><span>我的订单</span></a>
+					<a href="/service/mylogistics"><img src="/resource/flower/image/icon/002.png" /><span>我的物流</span></a>
+					<a href="/product/3"><img src="/resource/flower/image/icon/003.png" /><span>我要送花</span></a>
+					<a href="/account/flowerseed"><img src="/resource/flower/image/icon/004.png" /><span>我的种植花束</span></a>
+					<a href="/account/mycash"><img src="/resource/flower/image/icon/005.png" /><span>我的花票</span><i>${cashcount}</i></a>
+					<a href="/account/binding"><img src="/resource/flower/image/icon/006.png" /><span>绑定手机</span><i>${account.tel!'未绑定'}</i></a>
+					<a href="/account/address"><img src="/resource/flower/image/icon/007.png" /><span>我的地址</span></a>
+					<a href="/account/invitefri"><img src="/resource/flower/image/icon/018.png" /><span>${yqhy!}</span></a>
+					<a href="/account/feedback" style="display: none;"><img src="/resource/flower/image/icon/008.png" /><span>意见反馈</span></a>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

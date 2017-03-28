@@ -1,0 +1,1040 @@
+package com.dao;
+
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFCellStyle;
+import org.apache.poi.hssf.usermodel.HSSFFont;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hssf.util.HSSFColor;
+import com.google.gson.Gson;
+import com.jfinal.kit.JsonKit;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.IAtom;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.weixin.sdk.utils.HttpUtils;
+import com.util.DeliveryDateUtil;
+import com.util.MD5;
+import com.util.SFUtil;
+import com.util.Constant.orderType;
+import com.util.Constant.singlews;
+import com.ws.ChatAnnotation;
+
+/**
+ * @Desc 物流数据接口
+ * */
+public class WLDao {
+	// websockt钥匙
+	static String code;
+	// 日期编码
+	static String dateCode;
+	// 需要配单的订单集合
+	static List<Record> list;
+	// websockt通信信息
+	static Map<String, Object> resultMap;
+	// 发货之物流条件
+	static String condition;
+	// 双品花束
+	static List<Record> spList;
+	// 双品花束分配游标
+	static int sp_index;
+	// 多品花束
+	static List<Record> dpList;
+	// 多品花束分配游标
+	static int dp_index;
+	
+	public static String testurl = "http://query.szdod.com/D2DReceiveOrder.aspx";
+	public static String Key = "870110";
+	public static String custCode = "C108";
+	
+	/**
+	 * @Desc 配单
+	 * */
+	public static void singleWL(String key) {
+		code = key;
+		Map<String, Object> chooseMap = DeliveryDateUtil.chooseDate();
+		// 判断是否在可配单时间范围内
+		if((boolean) chooseMap.get("result")){
+			int reach = (int) chooseMap.get("reach");
+			dateCode = (String) chooseMap.get("datecode");
+			// 本批次的产品数量
+			Number fpnum = Db.queryNumber("select count(1) from f_product where code = ?", dateCode);
+			if(fpnum.intValue() == 0){
+				resultMap = new HashMap<>();
+				resultMap.put("code", singlews.CODE0.code);
+				resultMap.put("msg", "<span>批次&nbsp;" + dateCode + "&nbsp;鲜花产品尚未选配</span>");
+				ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+			}else{
+				Number oinum = Db.queryNumber("select count(1) from f_order_info where state>=2 and code=?", dateCode);
+				if(oinum.intValue() > 0){	// 发货已完成
+					resultMap = new HashMap<>();
+					resultMap.put("code", singlews.CODE0.code);
+					resultMap.put("msg", "<span>批次&nbsp;" + dateCode + "&nbsp;发货已完成</span>");
+					ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+				}else{
+					list = Db.find("select id,ordercode,aid,name,tel,addr,cycle,isvase,jh_list,jh_color,type,szdx,ocount,ishas,is_sy,sy_code from f_order where state=1 and reach=? and DATE_ADD(ctime, INTERVAL 54 HOUR)<? and (is_sy=0 or (is_sy=1 and sy_code=?) or (is_sy=1 and DATEDIFF(sy_code, "+dateCode+")=14))", reach, dateCode, dateCode);
+					if(list.size() == 0){
+						resultMap = new HashMap<>();
+						resultMap.put("code", singlews.CODE0.code);
+						resultMap.put("msg", "<span>批次&nbsp;" + dateCode + "&nbsp;没有符合条件的订单</span>");
+						ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+						return;
+					}
+					if(!flowerPriceValid(dateCode)){
+						resultMap = new HashMap<>();
+						resultMap.put("code", singlews.CODE0.code);
+						resultMap.put("msg", "<span>批次&nbsp;" + dateCode + "&nbsp;花材价格不完善</span>");
+						ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+						return;
+					}
+					resultMap = new HashMap<>();
+					resultMap.put("code", singlews.CODE1.code);
+					resultMap.put("msg", list.size());
+					ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+					boolean tx_result = Db.tx(new IAtom() {
+						@Override
+						public boolean run() throws SQLException {
+							boolean oi_result = false;
+							Db.update("delete from f_order_info where code=?", dateCode);
+							// 获取待分配产品信息
+							getProMap();
+							for(int i=0;i<list.size();i++){
+								Record order = list.get(i);
+								if(order.getInt("type") == orderType.TYPE1.type){	// 订阅
+									oi_result = saveOrderInfo_dy(order);
+								}else if(order.getInt("type") == orderType.TYPE2.type){   // 送花
+									oi_result = saveOrderInfo_sh(order);
+								}else if(order.getInt("type") == orderType.TYPE3.type){   // 周边
+									oi_result = saveOrderInfo_zb(order);
+								}else if(order.getInt("type") == orderType.TYPE4.type){   // 兑换
+									oi_result = saveOrderInfo_dh(order);
+								}
+								if(oi_result){
+									resultMap = new HashMap<>();
+									resultMap.put("code", singlews.CODE2.code);
+									resultMap.put("msg", i+1);
+									ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+								}else{
+									break;
+								}
+							}
+							return oi_result;
+						}
+					});
+					if(tx_result){
+						resultMap = new HashMap<>();
+						resultMap.put("code", singlews.CODE3.code);
+						ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+					}else{
+						resultMap = new HashMap<>();
+						resultMap.put("code", singlews.CODE4.code);
+						resultMap.put("msg", "<span>配单出错，操作终止</span>");
+						ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+					}
+				}
+			}
+		}else{	// 不在可配单时间范围内
+			resultMap = new HashMap<>();
+			resultMap.put("code", singlews.CODE0.code);
+			resultMap.put("msg", "<span>周三(18:00)-周五(18:00),配本周六;</span><br><span>周五(18:00)-周日,配下周一;</span>");
+			ChatAnnotation.broadcast(code, JsonKit.toJson(resultMap));	// 配单反馈信息
+		}
+	}
+	
+	// 获取待分配产品信息
+	public static void getProMap(){
+		// 双品花束
+		spList = Db.find("select id from f_product where type=1 and code=?", dateCode);
+		// 多品花束
+		dpList = Db.find("select id from f_product where type=2 and code=?", dateCode);
+		for(int i=0;i<spList.size();i++){
+			// 添加计数标识
+			spList.get(i).set("c_index", i);
+		}
+		for(int i=0;i<dpList.size();i++){
+			// 添加计数标识
+			dpList.get(i).set("c_index", i);
+		}
+		sp_index = 0;
+		dp_index = 0;
+	}
+	
+	/**
+	 * @Desc 订阅1
+	 * */
+	public static boolean saveOrderInfo_dy(Record order){
+		// 订单编号
+		String ordercode = order.getStr("ordercode");
+		// 订阅周期
+		int cycle = order.getInt("cycle");
+		// 已发次数
+		int ocount = order.getInt("ocount");
+		// 获取分享订单
+		Record share = Db.findFirst("select id,ordercode,aid,name,tel,addr,cycle,ocount from f_share where aid is not null and ordercode=? and ocount < cycle", ordercode);
+		return dingyue(1, order, share, cycle-ocount);
+	}
+	
+	/**
+	 * @Desc 送花2
+	 * */
+	public static boolean saveOrderInfo_sh(Record order){
+		boolean result = false;
+		// 获取本批次产品
+		List<Record> proList = Db.find("SELECT b.id FROM f_order_detail a LEFT JOIN f_product b ON a.fpid=b.fpid WHERE a.ordercode=? AND a.type=1 AND b.code=? AND b.type=3 AND b.iid=?", order.getStr("ordercode"), dateCode, order.getInt("szdx"));
+		if(proList.size() > 0){
+			// 创建物流信息
+			Map<String, Object> map = saveOrderInfo(order.getStr("ordercode"), order.getStr("name"), order.getStr("tel"), order.getStr("addr"), order.getInt("aid"), 1, order.getInt("ishas"));
+			if((boolean) map.get("result")){
+				// 保存物流详情
+				result = saveOrderPro((int) map.get("id"), randomId(3, proList), 0);
+				// 判断是否购买花瓶
+				if(order.getInt("isvase")==1){
+					int vaseid = Db.queryInt("select fpid from f_order_detail where ordercode=? and type=2", order.getStr("ordercode"));
+					// 保存物流详情
+					result = saveOrderPro((int) map.get("id"), vaseid, 1);
+				}
+			}
+		}else{
+			// 异常订单处理
+			Map<String, Object> ycMap = saveOrderInfo(order.getStr("ordercode"), order.getStr("name"), order.getStr("tel"), order.getStr("addr"), order.getInt("aid"), 0, 1);
+			result = (boolean) ycMap.get("result");
+		}
+		return result;
+	}
+	
+	/**
+	 * @Desc 周边3
+	 * */
+	public static boolean saveOrderInfo_zb(Record order){
+		boolean result = false;
+		// 创建物流信息
+		Map<String, Object> map = saveOrderInfo(order.getStr("ordercode"), order.getStr("name"), order.getStr("tel"), order.getStr("addr"), order.getInt("aid"), 1, order.getInt("ishas"));
+		if((boolean) map.get("result")){
+			int fpid = Db.queryInt("select fpid from f_order_detail where ordercode = ?", order.getStr("ordercode"));
+			// 保存物流详情
+			result = saveOrderPro((int) map.get("id"), fpid, 1);
+		}
+		return result;
+	}
+	
+	/**
+	 * @Desc 兑换4
+	 * */
+	public static boolean saveOrderInfo_dh(Record order){
+		return dingyue(4, order, null, 1);
+	}
+	
+	// 订阅花束
+	public static boolean dingyue(int type, Record order, Record share, int num){
+		boolean result = false;
+		// 订单编号
+		String ordercode = order.getStr("ordercode");
+		// 收货人姓名
+		String name = order.getStr("name");
+		// 收货人电话
+		String tel = order.getStr("tel");
+		// 收货人地址
+		String address = order.getStr("addr");
+		// 用户ID
+		int aid = order.getInt("aid");
+		// 获取订单主件商品的ID(1双品花束,2多品花束)
+		int fpid = Db.queryInt("select fpid from f_order_detail where ordercode=? and type=1", ordercode);
+		List<Record> nowProList;
+		Map<String, Object> overMap;
+		if(fpid == 1){
+			// 获取已送过的花并排除
+			overMap = getHasGet(spList, ordercode);
+			nowProList = (List<Record>) overMap.get("proList");
+			// 只有双品可以设置忌讳
+			nowProList = tabooAndExclude(order, nowProList);
+		}else{
+			// 获取已送过的花并排除
+			overMap = getHasGet(dpList, ordercode);
+			nowProList = (List<Record>) overMap.get("proList");
+		}
+		
+		if(nowProList.size() > 0){
+			// 分享订单物流信息
+			Map<String, Object> shareMap = new HashMap<>();
+			// 普通订单物流信息
+			Map<String, Object> orderMap = new HashMap<>();
+			// 是否已存在物流信息
+			int hassize = ((int)overMap.get("hasgetsize"))==0?0:1;
+			// 是否首单首次物流
+			int ishas = 1;
+			// 是否首单首次物流
+			if(hassize==0 && order.getInt("ishas")==0){
+				ishas = 0;
+			}
+			if(share != null){
+				shareMap = saveOrderInfo(share.getStr("ordercode"), share.getStr("name"), share.getStr("tel"), share.getStr("addr"), share.getInt("aid"), 1, 1);
+				if(num-share.getInt("cycle") > 0){
+					orderMap = saveOrderInfo(ordercode, name, tel, address, aid, 1, ishas);
+				}
+			}else{
+				orderMap = saveOrderInfo(ordercode, name, tel, address, aid, 1, ishas);
+			}
+			// 循环分配花束
+			int pid = randomId(fpid, nowProList);
+			// 订单第一次物流
+			if(((int)overMap.get("hasgetsize")) == 0){
+				// 判断是否购买花瓶
+				if(order.getInt("isvase")==1){
+					int vaseid = Db.queryInt("select fpid from f_order_detail where ordercode=? and type=2", ordercode);
+					if(orderMap.get("result") != null){
+						if((boolean) orderMap.get("result")){
+							// 保存物流详情
+							saveOrderPro((int) orderMap.get("id"), vaseid, 1);
+						}
+					}else{
+						Map<String, Object> vaseMap = saveOrderInfo(ordercode, name, tel, address, aid, 1, ishas);
+						if((boolean) vaseMap.get("result")){
+							// 保存物流详情
+							saveOrderPro((int) vaseMap.get("id"), vaseid, 1);
+						}
+					}
+				}
+				// 订阅首单第一次物流赠送周边
+				if(type == 1){
+					// 保存首单赠送的周边
+					List<Record> details = Db.find("select fpid,type from f_order_detail where ordercode=?", order.getStr("ordercode"));
+					if(details.size() > 1){
+						for (Record detail : details) {
+							if(detail.getInt("type") == 3){
+								saveOrderPro((int) orderMap.get("id"), detail.getInt("fpid"), 2);	// 保存 赠品 物流详情
+							}
+						}
+					}
+				}
+			}
+			if(orderMap.get("result")!=null && (boolean) orderMap.get("result")){
+				// 保存物流详情
+				result = saveOrderPro((int) orderMap.get("id"), pid, 0);
+			}
+			if(shareMap.get("result")!=null && (boolean) shareMap.get("result")){
+				// 保存物流详情
+				result = saveOrderPro((int) shareMap.get("id"), pid, 0);
+			}
+		}else{
+			// 异常订单处理
+			Map<String, Object> ycMap = saveOrderInfo(ordercode, name, tel, address, aid, 0, 1);
+			result = (boolean) ycMap.get("result");
+		}
+		return result;
+	}
+	
+	// 创建物流信息
+	public static Map<String, Object> saveOrderInfo(String ordercode, String name, String tel, String addr, int aid, int state, int ishas){
+		Map<String, Object> resultMap = new HashMap<>();
+		boolean result = false;
+		Record orderinfo = new Record();
+		String number = "FMM" + System.currentTimeMillis();
+		orderinfo.set("code", dateCode);
+		orderinfo.set("ordercode", ordercode);
+		orderinfo.set("number", number);
+		String ecode = "sf";	// 默认顺丰速递
+		orderinfo.set("ecode", ecode);
+		Record express = Db.findFirst("select name from f_express where code=?", ecode);	// 获取物流平台名称
+		orderinfo.set("ename", express.getStr("name"));
+		orderinfo.set("name", name);
+		orderinfo.set("tel", tel);
+		orderinfo.set("address", addr);
+		orderinfo.set("aid", aid);
+		orderinfo.set("ctime", new Date());
+		orderinfo.set("state", state);	// 物流状态(0异常,1正常,2发货,9确认收货)
+		orderinfo.set("ishas", ishas);	// 是否首单首条物流(0是/1否)
+		Number ofcycle = Db.queryNumber("select count(1) from f_order_info where ordercode=?", ordercode);
+		orderinfo.set("ofcycle", ofcycle.intValue()+1);
+		if(Db.save("f_order_info", orderinfo)){
+			result = true;
+			resultMap.put("id", (int) ((long) orderinfo.getLong("id")));
+		}
+		resultMap.put("result", result);
+		return resultMap;
+	}
+	
+	// 循环分配花束
+	public static int randomId(int fpid, List<Record> proList) {
+		int now_index = 0;
+		int max_index = 0;
+		if(fpid == 1){
+			now_index = sp_index;
+			max_index = spList.size()-1;
+		}else if(fpid == 2){
+			now_index = dp_index;
+			max_index = dpList.size()-1;
+		}
+		if(fpid < 3){
+			if(now_index == max_index){
+				now_index = 0;
+			}
+			boolean R = false;
+			for(Record record:proList){
+				if(record.getInt("c_index")==now_index){
+					R = true;
+				}
+			}
+			if(!R){
+				now_index = proList.get(0).getInt("c_index");
+			}
+			sp_index = now_index+1;
+		}else{
+			Random random=new Random();
+			now_index = random.nextInt(proList.size());
+		}
+		Record pro = new Record();
+		if(proList.size()==1){
+			pro = proList.get(0);
+		}else{
+			if(fpid==1 || fpid==2){
+				for(Record record:proList){
+					if(record.getInt("c_index")==now_index){
+						pro = record;
+					}
+				}
+			}else{
+				pro = proList.get(now_index);
+			}
+		}
+		return pro.getInt("id");
+	}
+	
+	// 保存物流详情
+	public static boolean saveOrderPro(int oid, int pid, int type){
+		Record orderpro = new Record();
+		orderpro.set("oid", oid);
+		orderpro.set("pid", pid);		// 随机分配花束
+		orderpro.set("type", type);		// 花束
+		return Db.save("f_order_pro", orderpro);
+	}
+	
+	// 获取已送过的花并排除
+	public static Map<String, Object> getHasGet(List<Record> proList, String ordercode){
+		Map<String, Object> map = new HashMap<>();
+		List<Record> nowProList = new ArrayList<>();
+		if(proList.size() > 0){
+			// 获取已送出的花束(花材ID集合)(最近4条记录)
+			List<Record> list = Db.find("select group_concat(c.fid order by c.fid asc) as gfid from f_order_info a"
+					+ " left join f_order_pro b on a.id=b.oid"
+					+ " left join f_product_info c on b.pid=c.pid"
+					+ " where b.type=0 and a.ordercode=? group by a.number order by a.id desc limit 0,4", ordercode);
+			map.put("hasgetsize", list.size());
+			String idStr = new String();
+			for(int i=0;i<proList.size();i++){
+				if(i==0){
+					idStr += proList.get(i).getInt("id");
+				}else{
+					idStr += "," + proList.get(i).getInt("id");
+				}
+			}
+			nowProList = Db.find("select pid as id,group_concat(fid order by fid asc) as gfid from f_product_info where pid in (" + idStr + ") group by pid");
+			for(Record nowpro:nowProList){
+				for(Record pro:proList){
+					if(nowpro.getInt("id").equals(pro.getInt("id"))){
+						nowpro.set("c_index", pro.getInt("c_index"));
+					}
+				}
+			}
+			for(Iterator<Record> it=nowProList.iterator();it.hasNext();){	// 匹配已送出的花束并排除
+				Record pro = it.next();
+				for(Record hg : list){
+					if(pro.getStr("gfid").equals(hg.getStr("gfid"))){
+						it.remove();
+						break;
+					}
+				}
+			}
+		}
+		map.put("proList", nowProList);
+		return map;
+	}
+	
+	// 排除忌讳的花类与色系
+	public static List<Record> tabooAndExclude(Record order, List<Record> proList){
+		// 忌讳的花类
+		String jh_list = order.getStr("jh_list");
+		// 忌讳的色系
+		String jh_color = order.getStr("jh_color");
+		String sql = "SELECT count(1) FROM f_product_info a LEFT JOIN f_flower b ON a.fid = b.id LEFT JOIN f_flower_type c ON b.tid=c.id WHERE a.pid=?";
+		if(jh_list!=null && jh_color!=null){
+			sql += " AND (b.cid IN("+jh_color+") OR c.id IN("+jh_list+"))";
+		}else if(jh_list!=null && jh_color==null){
+			sql += " AND c.id IN("+jh_list+")";
+		}else if(jh_list==null && jh_color!=null){
+			sql += " AND b.cid IN("+jh_color+")";
+		}
+		if(jh_list!=null || jh_color!=null){
+			for(Iterator<Record> it = proList.iterator();it.hasNext();){
+				Record pro = it.next();
+				// 计算产品中是否包含忌讳的花材
+				Number jh = Db.queryNumber(sql, pro.getInt("id"));
+				if(jh.intValue() > 0){
+					it.remove();
+				}
+			}
+		}
+		return proList;
+	}
+	
+	// 发货
+	public static Map<String, Object> seedGoods(String wlcode, int ishas){
+		Map<String, Object> resultMap = new HashMap<>();
+		boolean R = false;
+		String M = new String();
+		Map<String, Object> chooseMap = DeliveryDateUtil.chooseDate();
+		boolean result = (boolean) chooseMap.get("result");
+		if(result){
+			dateCode = (String) chooseMap.get("datecode");
+			condition = new String();
+			if(!"xzwl".equalsIgnoreCase(wlcode)){
+				condition += " and ecode='" + wlcode + "'";
+			}
+			if(ishas != 10){
+				condition += " and ishas='" + ishas + "'";
+			}
+			// 物流状态(0异常,1正常,2发货,9确认收货)
+			// 本批次的物流数量
+			Number wl = Db.queryNumber("select count(1) from f_order_info where code=?", dateCode);
+			// 异常物流数量
+			Number yc = Db.queryNumber("select count(1) from f_order_info where code=? and state=0", dateCode);
+			// 已发货的物流数量
+			Number yf = Db.queryNumber("select count(1) from f_order_info where code=? and state=2" + condition, dateCode);
+			if(wl.intValue() > 0){
+				if(yc.intValue() == 0){
+					if(yf.intValue() == 0){
+						R = Db.tx(new IAtom() {
+								@Override
+								public boolean run() throws SQLException {
+									// 顺丰发货方名字
+									String j_contact = Db.queryStr("select code_value from f_dictionary where code_key=?", "j_contact");
+									// 顺丰发货方联系电话
+									String j_tel = Db.queryStr("select code_value from f_dictionary where code_key=?", "j_tel");
+									// 顺丰发货方地址
+									String j_address = Db.queryStr("select code_value from f_dictionary where code_key=?", "j_address");
+									boolean fahuo_result = true;
+									// 正常物流信息列表(等待发货)
+									List<Record> wuliulist = Db.find("select id,ordercode,number,aid,ecode,name,tel,address,ofcycle,ishas from f_order_info where code=?" + condition, dateCode);
+									for(Record wuliu : wuliulist){
+										// 物流记录ID
+										int id = wuliu.getInt("id");
+										// 物流所属订单编号
+										String ordercode = wuliu.getStr("ordercode");
+										// 物流所属用户ID
+										int aid = wuliu.getInt("aid");
+										// 获取主单信息
+										Record order = Db.findFirst("select id,jihui,zhufu,songhua,cycle,ocount,aid from f_order where ordercode=?", ordercode);
+										// 已送次数
+										int ocount = order.getInt("ocount");
+										// 修改已送次数
+										order.set("ocount", ++ocount);
+										// 主订单余量修改
+										if(Db.update("f_order", order)){
+											// 分享订单余量修改(用户ID用来防止主订单干扰)
+											Db.update("update f_share set ocount=ocount+1 where ordercode=? and aid=?", ordercode, aid);
+											// 物流记录修改状态(已发货)
+											int rn = Db.update("update f_order_info set state=2 where id=?", id);
+											// 判断是否为最后一条物流单
+											if(order.getInt("cycle") == ocount){
+												order.set("state", 2);
+												Db.update("f_order", order);
+											}
+											if(rn == 0){
+												fahuo_result = false;
+												break;
+											}
+										}
+										// 商家系统同步订单信息
+										if("sf".equalsIgnoreCase(wuliu.getStr("ecode"))){
+											String[] addArr = wuliu.getStr("address").split("-", 4);
+											String province="未填",city="未填",county="未填";
+											try {
+												province = addArr[0];
+												city = addArr[1];
+												county = addArr[2];
+												fahuo_result = SFUtil.synchroSF(ordercode, wuliu.getStr("number"), wuliu.getStr("name"), wuliu.getStr("tel"), 
+																province, city, county, addArr[addArr.length-1], j_contact, j_tel, j_address);
+											} catch (Exception e) {
+												e.printStackTrace();
+											}
+											if(!fahuo_result){
+												break;
+											}
+										}else if("d2d".equalsIgnoreCase(wuliu.getStr("ecode"))){
+											int ishas = wuliu.getInt("ishas");
+											String first = ishas==0?"首单":"非首单";
+											first += "第" + wuliu.getInt("ofcycle") + "/" + order.getInt("cycle") + "次";
+											String jihui = order.getStr("jihui");
+											jihui = jihui==null?"":(" | 忌讳的花:"+jihui);
+											String remark = first+jihui;
+											// 首单
+											int isbuy = Db.queryInt("select isbuy from f_account where id=?", order.getInt("aid"));
+											// 商品名
+											String goodsname = Db.queryStr("select group_concat(b.name) from f_order_detail a "
+													+ "left join f_flower_pro b on a.fpid=b.id where a.ordercode=? and a.type=1", ordercode);
+											goodsname = goodsname + ";产品名称：";
+											List<Record> opList = Db.find("select pid,type from f_order_pro where oid=?", id);
+											for(int i=0;i<opList.size();i++){
+												Record op = opList.get(i);
+												int pid = op.getInt("pid");
+												int type = op.getInt("type");
+												String name = new String();
+												if(type == 0){
+													name = Db.queryStr("select fname from f_product where id=?", pid);
+												}else{
+													name = Db.queryStr("select name from f_flower_pro where id=?", pid);
+												}
+												if(i==0){
+													goodsname += name;
+												}else{
+													if(order.getInt("ocount")==1){
+														if(isbuy==1){
+															goodsname += ";（首单赠品）："+name;
+														}else{
+															goodsname += ","+name;
+														}
+													}
+												}
+											}
+											// 祝福语
+											String zhufu = order.getStr("zhufu");
+											// 送花人
+											String songhua = order.getStr("songhua");
+											if(((zhufu!=null && zhufu!="") || (songhua!=null && songhua!="")) && order.getInt("ocount")==1){
+												goodsname += ";祝福："+zhufu+";送花人："+songhua;
+											}
+											fahuo_result = synchroD2D(ordercode, wuliu.getStr("number"), wuliu.getStr("name"), wuliu.getStr("address"), wuliu.getStr("tel"), remark, goodsname);
+											if(!fahuo_result){
+												break;
+											}
+										}else{
+											fahuo_result = false;
+											break;
+										}
+									}
+									return fahuo_result;
+								}
+							});
+						if(R){
+							M = "批次"+dateCode+"发货成功";
+						}else{
+							M = "批次"+dateCode+"发货失败";
+						}
+					}else{
+						M = "批次"+dateCode+"已经发货,无法重复发货";
+					}
+				}else{
+					M = "批次"+dateCode+"存在异常物流信息,发货失败";
+				}
+			}else{
+				M = "批次"+dateCode+"尚未配单,无法发货";
+			}
+		}else{
+			M = "不在发货时间内";
+		}
+		resultMap.put("R", R);
+		resultMap.put("M", M);
+		return resultMap;
+	}
+	
+	// 打印门对门物流信息
+	public static List<Record> print(){
+		Map<String, Object> chooseMap = DeliveryDateUtil.chooseDate();
+		boolean result = (boolean) chooseMap.get("result");
+		List<Record> list = new ArrayList<>();
+		if(result){
+			dateCode = (String) chooseMap.get("datecode");
+			list = Db.find("select ordercode from f_order_info where code=?", dateCode);
+		}
+		return list;
+	}
+	
+	// 导出物流单
+	public static boolean getlogisticForExcel(HttpServletResponse response, String ecode, int ishas, String code){
+		String sql = "SELECT a.ordercode,c.aid,a.number,a.name,a.tel,a.address,a.ofcycle,GROUP_CONCAT(CONCAT(b.pid,'-',b.type)) AS pit,c.jihui,c.color,a.ishas,0 AS price,c.cycle,c.songhua,c.zhufu"
+				+ " FROM f_order_info a LEFT JOIN f_order_pro b ON a.id=b.oid"
+				+ " LEFT JOIN f_order c ON a.ordercode=c.ordercode WHERE a.code=? AND a.ecode=?";
+		if(ishas != 10){
+			sql += " AND a.ishas="+ishas;
+		}
+		sql += " GROUP BY number";
+		List<Record> wllist = Db.find(sql, code, ecode);	// 导出物流
+		for(Record wl : wllist){
+			String pit = wl.getStr("pit");
+			if(pit != null){
+				String[] pitArr = pit.split(",");
+				String pname = new String();
+				for(int i=0;i<pitArr.length;i++){
+					String p = pitArr[i];
+					String name = new String();
+					if(Integer.parseInt(p.split("-")[1]) == 0){
+						name = Db.queryStr("SELECT fname FROM f_product WHERE id=?", Integer.parseInt(p.split("-")[0]));
+					}else{
+						if(Integer.parseInt(p.split("-")[1]) == 1){
+							name = Db.queryStr("SELECT name FROM f_flower_pro WHERE id=?", Integer.parseInt(p.split("-")[0]));
+						}else{
+							name = "(首单赠品)"+Db.queryStr("SELECT name FROM f_flower_pro WHERE id=?", Integer.parseInt(p.split("-")[0]));
+						}
+					}
+					if(i==0){
+						pname = name;
+					}else{
+						pname += ","+name;
+					}
+				}
+				wl.set("pname", pname);
+			}else{
+				return false;
+			}
+		}
+		HSSFWorkbook wbook = new HSSFWorkbook();
+		HSSFSheet sheet1 = wbook.createSheet();
+		//设置列宽
+		sheet1.setColumnWidth((short)0, (short)6400);
+		sheet1.setColumnWidth((short)1, (short)6400);
+		sheet1.setColumnWidth((short)2, (short)2400);
+		sheet1.setColumnWidth((short)3, (short)2400);
+		sheet1.setColumnWidth((short)4, (short)5400);
+		sheet1.setColumnWidth((short)5, (short)12800);
+		sheet1.setColumnWidth((short)6, (short)6400);
+		sheet1.setColumnWidth((short)7, (short)6400);
+		sheet1.setColumnWidth((short)8, (short)6400);
+		sheet1.setColumnWidth((short)9, (short)3000);
+		sheet1.setColumnWidth((short)10, (short)2400);
+		String ename = Db.queryStr("select name from f_express where code=?", ecode);
+		wbook.setSheetName(0, ename, (short)1);
+		//首行 样式1
+        HSSFCellStyle cellStyle = wbook.createCellStyle();
+        HSSFFont font = wbook.createFont();
+        font.setColor(HSSFColor.RED.index);    //红字
+        cellStyle.setFont(font);
+        cellStyle.setFillPattern(HSSFCellStyle.SOLID_FOREGROUND);  //填充单元格
+        cellStyle.setFillForegroundColor(HSSFColor.LIGHT_YELLOW.index); //填亮黄色
+        cellStyle.setBorderBottom(HSSFCellStyle.BORDER_THIN); //下边框    
+        cellStyle.setBorderLeft(HSSFCellStyle.BORDER_THIN);//左边框    
+        cellStyle.setBorderTop(HSSFCellStyle.BORDER_THIN);//上边框    
+        cellStyle.setBorderRight(HSSFCellStyle.BORDER_THIN);//右边框    
+        cellStyle.setAlignment(HSSFCellStyle.ALIGN_CENTER); // 居中    
+        //样式2
+        HSSFCellStyle cellStyle1 = wbook.createCellStyle();
+        cellStyle1.setBorderBottom(HSSFCellStyle.BORDER_THIN); //下边框    
+        cellStyle1.setBorderLeft(HSSFCellStyle.BORDER_THIN);//左边框    
+        cellStyle1.setBorderTop(HSSFCellStyle.BORDER_THIN);//上边框    
+        cellStyle1.setBorderRight(HSSFCellStyle.BORDER_THIN);//右边框    
+       //首行 样式2
+        HSSFCellStyle cellStyle2 = wbook.createCellStyle();
+        font = wbook.createFont();
+        font.setColor(HSSFColor.RED.index);    //红字
+        cellStyle2.setFont(font);
+        cellStyle2.setFillPattern(HSSFCellStyle.SOLID_FOREGROUND);  //填充单元格
+        cellStyle2.setFillForegroundColor(HSSFColor.TAN.index); //填橘黄
+        cellStyle2.setAlignment(HSSFCellStyle.ALIGN_CENTER); // 居中    
+          
+		HSSFRow row;
+		for(int i=0;i<wllist.size();i++){
+			if(i==0){
+				row = sheet1.createRow(i);
+				HSSFCell cell0 = row.createCell((short) 0);
+				cell0.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell0.setCellStyle(cellStyle);
+				cell0.setCellValue("用户订单号");
+				HSSFCell cell1 = row.createCell((short) 1);
+				cell1.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell1.setCellStyle(cellStyle);
+				cell1.setCellValue("物流编码");
+				HSSFCell cell2 = row.createCell((short) 2);
+				cell2.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell2.setCellStyle(cellStyle);
+				cell2.setCellValue("用户ID");
+				HSSFCell cell3 = row.createCell((short) 3);
+				cell3.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell3.setCellStyle(cellStyle);
+				cell3.setCellValue("联系人");
+				HSSFCell cell4 = row.createCell((short) 4);
+				cell4.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell4.setCellStyle(cellStyle);
+				cell4.setCellValue("联系电话");
+				HSSFCell cell5 = row.createCell((short) 5);
+				cell5.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell5.setCellStyle(cellStyle);
+				cell5.setCellValue("详细地址");
+				HSSFCell cell6 = row.createCell((short) 6);
+				cell6.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell6.setCellStyle(cellStyle2);
+				cell6.setCellValue("品名");
+				HSSFCell cell7 = row.createCell((short) 7);
+				cell7.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell7.setCellStyle(cellStyle);
+				cell7.setCellValue("忌讳的花");
+				HSSFCell cell8 = row.createCell((short) 8);
+				cell8.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell8.setCellStyle(cellStyle);
+				cell8.setCellValue("忌讳色系");
+				HSSFCell cell9 = row.createCell((short) 9);
+				cell9.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell9.setCellStyle(cellStyle);
+				cell9.setCellValue("首单");
+				HSSFCell cell10 = row.createCell((short) 10);
+				cell10.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell10.setCellStyle(cellStyle);
+				cell10.setCellValue("金额");
+				HSSFCell cell11 = row.createCell((short) 11);
+				cell11.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell11.setCellStyle(cellStyle);
+				cell11.setCellValue("送花人");
+				HSSFCell cell12 = row.createCell((short) 12);
+				cell12.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell12.setCellStyle(cellStyle);
+				cell12.setCellValue("祝福语");
+				HSSFCell cell13 = row.createCell((short) 13);
+				cell13.setEncoding(HSSFCell.ENCODING_UTF_16);
+				cell13.setCellStyle(cellStyle);
+				cell13.setCellValue("发货次数");
+			}
+			row = sheet1.createRow(i+1);
+			Record r = wllist.get(i);
+			HSSFCell cell0 = row.createCell((short) 0);
+			cell0.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell0.setCellStyle(cellStyle1);
+			cell0.setCellValue(r.getStr("ordercode"));
+			HSSFCell cell1 = row.createCell((short) 1);
+			cell1.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell1.setCellStyle(cellStyle1);
+			cell1.setCellValue(r.getStr("number"));
+			HSSFCell cell2 = row.createCell((short) 2);
+			cell2.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell2.setCellStyle(cellStyle1);
+			cell2.setCellValue(r.getInt("aid"));
+			HSSFCell cell3 = row.createCell((short) 3);
+			cell3.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell3.setCellStyle(cellStyle1);
+			cell3.setCellValue(r.getStr("name"));
+			HSSFCell cell4 = row.createCell((short) 4);
+			cell4.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell4.setCellStyle(cellStyle1);
+			cell4.setCellValue(r.getStr("tel"));
+			HSSFCell cell5 = row.createCell((short) 5);
+			cell5.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell5.setCellStyle(cellStyle1);
+			cell5.setCellValue(r.getStr("address"));
+			HSSFCell cell6 = row.createCell((short) 6);
+			cell6.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell6.setCellStyle(cellStyle1);
+			cell6.setCellValue(r.getStr("pname"));
+			HSSFCell cell7 = row.createCell((short) 7);
+			cell7.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell7.setCellStyle(cellStyle1);
+			cell7.setCellValue(r.getStr("jihui")==null?"无":r.getStr("jihui"));
+			HSSFCell cell8 = row.createCell((short) 8);
+			cell8.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell8.setCellStyle(cellStyle1);
+			cell8.setCellValue(r.getStr("color")==null?"无":r.getStr("color"));
+			HSSFCell cell9 = row.createCell((short) 9);
+			cell9.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell9.setCellStyle(cellStyle1);
+			cell9.setCellValue(r.getInt("ishas")==0?"首单":"普通");
+			HSSFCell cell10 = row.createCell((short) 10);
+			cell10.setCellStyle(cellStyle1);
+			cell10.setCellValue(r.getLong("price"));
+			HSSFCell cell11 = row.createCell((short) 11);
+			cell11.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell11.setCellStyle(cellStyle1);
+			cell11.setCellValue(r.getStr("songhua"));
+			HSSFCell cell12 = row.createCell((short) 12);
+			cell12.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell12.setCellStyle(cellStyle1);
+			cell12.setCellValue(r.getStr("zhufu"));
+			HSSFCell cell13 = row.createCell((short) 13);
+			cell13.setEncoding(HSSFCell.ENCODING_UTF_16);
+			cell13.setCellStyle(cellStyle1);
+			cell13.setCellValue(r.getInt("ofcycle")+"/"+r.getInt("cycle"));
+		}
+		response.addHeader("Content-Disposition", "attachment;filename=" + toUtf8String(ename+"-物流订单")+ ".xls");
+		response.setContentType("application/vnd.ms-excel;charset=utf-8");
+		try {
+			ServletOutputStream out = response.getOutputStream();
+			wbook.write(out);
+			out.flush();
+			out.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return true;
+	}
+	
+	// 花材价格检查
+	public static boolean flowerPriceValid(String datecode){
+		List<Record> pricelist = Db.find("SELECT fid,type FROM f_flower_price WHERE code = ?", datecode);
+		// 订阅级
+		List <Record> listA = Db.find("SELECT a.type,b.fid FROM f_product a LEFT JOIN f_product_info b ON a.id=b.pid WHERE a.code=? and (a.type=1 or a.type=2) GROUP BY b.fid", datecode);
+		// 送花级
+		List <Record> listB = Db.find("SELECT a.type,b.fid FROM f_product a LEFT JOIN f_product_info b ON a.id=b.pid WHERE a.code=? AND a.type=3 GROUP BY b.fid", datecode);
+		for(Record A : listA){
+			boolean rA = false;
+			for(Record price : pricelist){
+				if(price.getInt("fid").equals(A.getInt("fid")) && price.getInt("type")==0){
+					rA = true;
+				}
+			}
+			if(!rA){
+				return false;
+			}
+		}
+		for(Record B : listB){
+			boolean rB = false;
+			for(Record price : pricelist){
+				if(price.getInt("fid").equals(B.getInt("fid")) && price.getInt("type")==1){
+					rB = true;
+				}
+			}
+			if(!rB){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	// 挑单
+	public static boolean synchro_toD2D(String dateCode){
+		boolean result = false;
+		// 正常物流信息列表(等待挑单)
+		List<Record> wllist = Db.find("select a.id,a.ordercode,a.number,a.aid,a.name,a.tel,a.address,a.ishas,a.ofcycle,b.cycle,b.jihui "
+				+ "from f_order_info a left join f_order b on a.ordercode=b.ordercode where a.code=?", dateCode);
+		for(Record wuliu : wllist){
+			// 物流记录ID
+			int id = wuliu.getInt("id");
+			// 物流所属订单编号
+			String ordercode = wuliu.getStr("ordercode");
+			// 主单信息
+			Record order = Db.findFirst("select id,jihui,zhufu,songhua,cycle,ocount,aid from f_order where ordercode=?", ordercode);
+			// 物流编码
+			String number = wuliu.getStr("number");
+			
+			int ishas = wuliu.getInt("ishas");
+			String first = ishas==0?"首单":"非首单";
+			first += "第" + wuliu.getInt("ofcycle") + "/" + wuliu.getInt("cycle") + "次";
+			String jihui = wuliu.getStr("jihui");
+			jihui = jihui==null?"":(" | 忌讳的花:"+jihui);
+			String remark = first+jihui;
+			// 首单
+			int isbuy = Db.queryInt("select isbuy from f_account where id=?", order.getInt("aid"));
+			// 商品名
+			String goodsname = Db.queryStr("select group_concat(b.name) from f_order_detail a left join f_flower_pro b on a.fpid=b.id where a.ordercode=? and a.type=1", ordercode);
+			goodsname = goodsname + ";产品名称：";
+			List<Record> opList = Db.find("select pid,type from f_order_pro where oid=?", id);
+			for(int i=0;i<opList.size();i++){
+				Record op = opList.get(i);
+				int pid = op.getInt("pid");
+				int type = op.getInt("type");
+				String name = new String();
+				if(type == 0){
+					name = Db.queryStr("select fname from f_product where id=?", pid);
+				}else{
+					name = Db.queryStr("select name from f_flower_pro where id=?", pid);
+				}
+				if(i==0){
+					goodsname += name;
+				}else{
+					if(order.getInt("ocount")==1){
+						if(isbuy==0){
+							goodsname += ";（首单赠品）："+name;
+						}else{
+							goodsname += ","+name;
+						}
+					}
+				}
+			}
+			// 祝福语
+			String zhufu = order.getStr("zhufu");
+			// 送花人
+			String songhua = order.getStr("songhua");
+			if(((zhufu!=null && zhufu!="") || (songhua!=null && songhua!="")) && order.getInt("ocount")==1){
+				goodsname += ";祝福："+zhufu+";送花人："+songhua;
+			}
+			result = synchroD2D(ordercode, number, wuliu.getStr("name"), wuliu.getStr("address"), wuliu.getStr("tel"), remark, goodsname);
+			if(!result){
+				break;
+			}
+		}
+		if(result){
+			Record record = new Record().set("code", dateCode).set("ctime", new Date());
+			result = Db.save("f_tiaodan", record);
+		}
+		return result;
+	}
+	
+	// 花美美订单信息同步至门对门商家系统
+	public static boolean synchroD2D(String ClientCode, String WorkCode, String GetPerson, String GetAddress, String GetPhone, String remark, String GoodsName) {
+		Map<String, String> params = new HashMap<>();
+		params.put("ClientCode", ClientCode);	// 订单号
+		params.put("WorkCode", WorkCode);		// 条码号(追溯号)
+		params.put("GetPerson", GetPerson);		// 收件人
+		
+		String[] addArr = GetAddress.split("-", 4);
+		String GetProvice="未填",GetCity="未填",GetCounty="未填";
+		GetProvice = addArr[0];
+		GetCity = addArr[1];
+		GetCounty = addArr[2];
+		
+		params.put("GetProvice", GetProvice);	// 收件(省)
+		params.put("GetCity", GetCity);		// 收件(市)
+		params.put("GetCounty", GetCounty);	// 收件(区/县)
+		
+		params.put("GetAddress", GetAddress);	// 收件人详细地址
+		params.put("GetPhone", GetPhone);		// 收件人联系电话
+		params.put("OrderHav", "1.0");			// 订单重量
+		params.put("ReplCost", "0");			// 代收货款
+		params.put("WorkType", "0");			// 订单类型
+		params.put("Payment", "1");				// 支付方式
+		params.put("OrderCodeType", "1");		// 单号类型
+		params.put("remark", remark);			// 备注
+		params.put("GoodsName", GoodsName);		// 商品名称
+		String jsonStr = JsonKit.toJson(params).replace("&", "");
+		String signedStr = MD5.MD5Encode(jsonStr + Key);
+		String requestStr = jsonStr + "&" + signedStr + "&" + custCode;
+		String rtnStr = HttpUtils.post(testurl, requestStr);
+		rtnStr = rtnStr.substring(1, rtnStr.length()-2);
+		Gson gson = new Gson();
+		Map<?, ?> map = gson.fromJson(rtnStr, HashMap.class);
+		if(Integer.parseInt(map.get("Rtn_Code").toString()) == 1){
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	// 设置中文文件名
+	public static String toUtf8String(String s){
+		StringBuffer sb = new StringBuffer();
+    	for (int i=0;i<s.length();i++){
+    		char c = s.charAt(i);
+    		if (c >= 0 && c <= 255){
+    			sb.append(c);}
+    		else{
+    			byte[] b;
+    			try {
+    				b = Character.toString(c).getBytes("utf-8");
+    			}catch (Exception ex) {
+    				b = new byte[0];
+    			}
+    			for (int j = 0; j < b.length; j++) {
+    				int k = b[j];
+    				if (k < 0) k += 256;
+    					sb.append("%" + Integer.toHexString(k).toUpperCase());
+    				}
+    			}
+    	}
+    	return sb.toString();
+	}
+}

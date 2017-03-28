@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="renderer" content="webkit|ie-comp|ie-stand">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+		<meta http-equiv="Cache-Control" content="no-siteapp" />
+		<meta name="format-detection" content="telephone=no" />
+		<link rel="stylesheet" type="text/css" href="/resource/H-ui.admin_v2.5/lib/Hui-iconfont/1.0.7/iconfont.css" />
+		<link rel="stylesheet" type="text/css" href="/resource/flower/css/flower.logistics.css" />
+		<style type="text/css">
+			body{background-color: #CFD4DA;}
+			.main{width: calc(100% - 30px);float: left;padding: 15px 15px;}
+			.g_1{width: calc(100% - 30px);height: 55px;float: left;background-color: white;margin: 20px 15px 35px;border-radius: 6px;}
+			.g_1 span:nth-child(1){width: 50px;height: 100%;float: left;}
+			.g_1 span:nth-child(2){width: calc(100% - 50px);height: 100%;float: left;text-align: left;font: 18px/55px 'Microsoft Yahei';color: #888;}
+			.g_2{width: 100%;float: left;}
+			.g_2 span{width: calc(100% - 30px);height: 196px;float: left;background: url("/resource/flower/image/envelop.png") no-repeat;background-size: 100% 100%;
+						background-size: 315px 196px;margin:0 15px 30px;box-shadow: 10px 9px 16px #888;text-align: center;font: 16px/100px 'Microsoft Yahei';color: #888;}
+			.no{width: 100%;text-align: center;margin-top: 60px;}
+		</style>
+		<script type="text/javascript" src="/resource/flower/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/resource/layer/layer.js"></script>
+		<script type="text/javascript" src="/resource/flower/js/flower.js"></script>
+		<title>所有祝福卡</title>
+		<script type="text/javascript">
+			function openenvlope(ordercode){
+				location.href = "/account/cardcontent/"+ordercode;
+			}
+		</script>
+	</head>
+	<body>
+		<div class="container">
+			<div class="main">
+				<#if cards?size gt 0>
+				<div class="g_1">
+					<span><img src="/resource/flower/image/warning.png" style="width: 30px; height: 30px;margin: 12.5px 10px;"></span>
+					<span>点开信封打开祝福卡</span>
+				</div>
+				<div class="g_2">
+					<#list cards as card>
+					<#if card??>
+					<span onclick="openenvlope('${card.ordercode}')">${card.ctime}</span>
+					</#if>
+					</#list>
+				</div>
+				<#else>
+				<div class="no">您当前没有祝福卡哦！</div>
+				</#if>
+			</div>
+		</div>
+	</body>
+</html>

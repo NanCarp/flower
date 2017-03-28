@@ -1,0 +1,268 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="renderer" content="webkit|ie-comp|ie-stand">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+		<meta http-equiv="Cache-Control" content="no-siteapp" />
+		<!--[if lt IE 9]>
+			<script type="text/javascript" src="/resource/H-ui.admin_v2.5/lib/html5.js"></script>
+			<script type="text/javascript" src="/resource/H-ui.admin_v2.5/lib/respond.min.js"></script>
+			<script type="text/javascript" src="/resource/H-ui.admin_v2.5/lib/PIE_IE678.js"></script>
+		<![endif]-->
+		<link rel="stylesheet" type="text/css" href="/resource/H-ui.admin_v2.5/static/h-ui/css/H-ui.min.css" />
+		<link rel="stylesheet" type="text/css" href="/resource/H-ui.admin_v2.5/static/h-ui.admin/css/H-ui.admin.css" />
+		<link rel="stylesheet" type="text/css" href="/resource/H-ui.admin_v2.5/lib/Hui-iconfont/1.0.7/iconfont.css" />
+		<style type="text/css">
+         .alladdr:hover {overflow:visible;position: absolute;font-weight: bolder;}
+		</style>
+		<title>物流管理 - 物流列表</title>
+	</head>
+	<body>
+		<nav class="breadcrumb"><i class="Hui-iconfont">&#xe67f;</i> 首页 <span class="c-gray en">&gt;</span> 物流管理 <span class="c-gray en">&gt;</span> 物流列表<a class="btn btn-success radius r" style="line-height:1.6em;margin-top:3px" href="javascript:location.replace(location.href);" title="刷新" ><i class="Hui-iconfont">&#xe68f;</i></a></nav>
+		<div class="page-container">
+			<div class="cl mb-10">
+				<a onclick="_add()" class="btn btn-primary"><i class="Hui-iconfont">&#xe6a2;</i> 物流配单</a>
+				<a onclick="_tiaodan()" class="btn btn-primary"><i class="Hui-iconfont">&#xe642;</i> 挑单</a>
+				<a onclick="_seed()" class="btn btn-primary ml-5"><i class="Hui-iconfont">&#xe669;</i> 发货</a>
+				<a onclick="_export()" class="btn btn-primary ml-5"><i class="Hui-iconfont">&#xe644;</i> 物流导出</a>
+				<input class="btn btn-primary ml-5" type="button" value="打印" onclick="print()">
+			</div>
+			<div class="cl pd-5 bg-1 bk-gray">
+				<span class="l">
+					<span class="select-box l" style="width: 130px">
+					  	<select class="select" size="1" onchange="searchstate(this)">
+					    	<option value="10" <#if state==10>selected</#if>>--选择状态--</option>
+					    	<option value="0" <#if state==0>selected</#if>>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;异常</option>
+					    	<option value="1" <#if state==1>selected</#if>>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;正常</option>
+					    	<option value="2" <#if state==2>selected</#if>>&nbsp;&nbsp;&nbsp;&nbsp;已发货</option>
+					    	<option value="9" <#if state==9>selected</#if>>&nbsp;&nbsp;&nbsp;&nbsp;已签收</option>
+					  	</select>
+					</span>
+					<span class="select-box l ml-10" style="width: 130px" id="wl">
+					  	<select class="select" size="1" onchange="searchwl(this)" id="wlcode">
+					    	<option value="xzwl" <#if wuliucode=='xzwl'>selected</#if>>--选择物流--</option>
+							<#if wuliulist?? && wuliulist?size gt 0>
+					    	<#list wuliulist as wuliu>
+					    	<#if wuliu??>
+					    	<option value="${wuliu.code}" <#if wuliucode==wuliu.code>selected</#if>>${wuliu.name}</option> 
+					    	</#if>
+					    	</#list>
+					    	<#else>
+					    	<option value="xzwl" <#if wuliucode=='xzwl'>selected</#if>>无</option>
+							</#if>
+					  	</select>
+					</span>
+					<span class="select-box l ml-10" style="width: 130px">
+					  	<select class="select" size="1" onchange="searchishas(this)" id="ishas">
+					    	<option value="10" <#if ishas==10>selected</#if>>--选择是否首单--</option>
+					    	<option value="0" <#if ishas==0>selected</#if>>首单</option>
+					    	<option value="1" <#if ishas==1>selected</#if>>普通</option>
+					  	</select>
+					</span>
+					<span class="l ml-10" style="width: 170px">
+						<input type="text" class="input-text" placeholder="输入批次查询" value="${picicode!}" id="picicode" maxlength="8">
+					</span>
+					<span class="l ml-10" style="width: 170px">
+						<input type="text" class="input-text" placeholder="输入订单编号查询" value="${ordercode!}" id="ordercode" maxlength="17">
+					</span>
+					<span class="l ml-10" style="width: 170px">
+						<input type="text" class="input-text" placeholder="输入物流编号查询" value="${logisticcode!}" id="logisticcode" maxlength="30">
+					</span>
+					<span class="l ml-10" style="width: 170px">
+						<input type="text" class="input-text" placeholder="输入收货人姓名查询" value="${receiver!}" id="receiver" maxlength="17">
+					</span>
+					<input class="btn btn-primary ml-10" type="submit" value="查找" onclick="searchcode()">
+				</span>
+				<span class="r" style="line-height: 31px;">共有数据：<strong>${totalrow}</strong> 条</span>
+			</div>
+			<div class="mt-10">
+			<table class="table table-border table-bordered table-hover table-bg table-sort">
+				<thead>
+					<tr class="text-c">
+						<th width="60">序列</th>
+						<th width="80">批次</th>
+						<th width="120">订单编号</th>
+						<th width="80">物流公司</th>
+						<th width="130">物流编号</th>
+						<th width="80">收货人姓名</th>
+						<th width="80">收货人电话</th>
+						<th width="130">订购商品</th>
+						<th width="60">发货次数</th>
+						<th width="130">发货产品</th>
+						<th width="60">产品成本</th>
+						<th width="130">收货人地址</th>
+						<th width="120">配单时间</th>
+						<th width="40">首单</th>
+						<th width="60">状态</th>
+						<th width="60">操作</th>
+					</tr>
+				</thead>
+				<tbody>
+					<#if orderinfolist?? && orderinfolist?size gt 0>
+					<#list orderinfolist as orderinfo>
+					<tr class="text-c">
+						<td>${orderinfo_index+1}</td>
+						<td>${orderinfo.code}</td>
+						<td>${orderinfo.ordercode}</td>
+						<td>${orderinfo.ename!}</td>
+						<td>${orderinfo.number}</td>
+						<td>${orderinfo.sname}</td>
+						<td>${orderinfo.tel}</td>
+						<td title="${orderinfo.dgsp!}">${orderinfo.dgsp!}</td>
+						<td>第${orderinfo.ofcycle}次</td>
+						<td title="${orderinfo.wlname!}">${orderinfo.wlname!}</td>
+						<td>&yen;${(orderinfo.cost!0)?string('0.00')}</td>
+						<td class="alladdr">${orderinfo.address}</td>
+						<td>${orderinfo.ctime}</td>
+						<td><#if orderinfo.ishas==0><span class="c-red">首单</span><#else><span class="c-green">普通</span></#if></td>
+						<td>
+							<#if orderinfo.state==0>
+							<span class="c-red">异常</span>
+							<#elseif orderinfo.state==1>
+							<span class="c-green">正常</span>
+							<#elseif orderinfo.state==2>
+							<span class="c-orange">已发货</span>
+							<#else>
+							<span class="c-blue">已签收</span>
+							</#if>
+						</td>
+						<td class="td-manage">
+							<a title="查看详情" onclick="_see(${orderinfo.id},'${orderinfo.number}')" style="text-decoration:none" class="f-16"><i class="Hui-iconfont">&#xe665;</i></a>
+						</td>
+					</tr>
+					</#list>
+					<#else>
+					<tr>
+						<td colspan="16" style="text-align: center;"><span>没有数据信息</span></td>
+					</tr>
+					</#if>
+				</tbody>
+			</table>
+			<div class="mt-10 text-r" id="forpage"></div>
+			</div>
+		</div>
+		<script type="text/javascript" src="/resource/flower/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/resource/flower/js/jquery.nicescroll.min.js"></script>
+		<script type="text/javascript" src="/resource/layer/layer.js"></script>
+		<script type="text/javascript" src="/resource/laypage/laypage.js"></script>
+		<script type="text/javascript" src="/resource/H-ui.admin_v2.5/static/h-ui/js/H-ui.js"></script>
+		<script type="text/javascript" src="/resource/H-ui.admin_v2.5/static/h-ui.admin/js/H-ui.admin.js"></script>
+		<script type="text/javascript">
+			var picicode='${picicode!}',ordercode='${ordercode!}',logisticcode='${logisticcode!}',state='${state!}',ishas='${ishas!}',wuliucode='${wuliucode!}',receiver='${receiver!}';
+			$(document).ready(function(){
+				laypage({
+				    cont: document.getElementById('forpage'), //容器。值支持id名、原生dom对象，jquery对象,
+				    pages: ${totalpage}, //总页数
+				    skin: '#5A98DE', //加载内置皮肤，也可以直接赋值16进制颜色值，如:#c00
+				    groups: 5, //连续显示分页数
+				    curr: ${pageno},
+				    jump: function(e, first){ //触发分页后的回调
+				        if(!first){ //一定要加此判断，否则初始时会无限刷新
+				            location.replace('/manage/iframe/logistics/orderinfo?pageno='+e.curr+'&picicode='+picicode+'&ordercode='+ordercode+'&logisticcode='+logisticcode+'&state='
+				            																+state+'&ishas='+ishas+'&wuliucode='+wuliucode+'&receiver='+receiver);
+				        }
+				    }
+				});
+				$("html").niceScroll({
+					cursorcolor:"#333",
+					cursoropacitymin: 0.6,
+					cursoropacitymax:0.6,
+					demode: false
+				});
+			});
+			function _tiaodan(){
+				var load = layer.load();
+				parent.actconfirm('确定挑单操作？', function(){
+					$.post("/wuliu/synchro_toD2D", function(data){
+						layer.close(load);
+						layer.msg(data.msg, {time: 3000});
+					});
+				});
+			}
+			function _add(){
+				parent.open_schedule('/logistics/startsingle','540','90');
+			}
+			function _seed(){
+				var wlcode = $('#wlcode option:selected').val();
+				if(wlcode=='xzwl'){
+					layer.msg("请选择物流发货", {time: 3000});return;
+				}
+				parent.actconfirm('确定发货？', function(){
+					var load = layer.load();
+					ishas = $('#ishas option:selected').val();
+					$.post('/manage/iframe/logistics/seedgoods/'+wlcode+'-'+ishas, function(data){
+						layer.close(load);
+						if(data.R){
+							layer.msg(data.M, {time: 2000}, function(){
+								location.replace(location.href);
+							});
+						}else{
+							layer.msg(data.M, {time: 3000});
+						}
+					});
+				});
+			}
+			function _see(id,code){
+				parent.open_window('物流详情','/logistics/orderpro/'+id+'-'+code,'970','540');
+			}
+			function searchstate(_state){
+				state = $(_state).find('option:selected').val();
+				location.replace('/manage/iframe/logistics/orderinfo?pageno=1&picicode='+picicode+'&ordercode='+ordercode+'&logisticcode='+logisticcode+'&state='+state+'&ishas='+ishas+'&wuliucode='+wuliucode+'&receiver='+receiver);
+			}
+			function searchishas(_ishas){
+				ishas = $(_ishas).find('option:selected').val();
+				location.replace('/manage/iframe/logistics/orderinfo?pageno=1&picicode='+picicode+'&ordercode='+ordercode+'&logisticcode='+logisticcode+'&state='+state+'&ishas='+ishas+'&wuliucode='+wuliucode+'&receiver='+receiver);
+			}
+			function searchwl(wuliucode){
+				wuliucode = $(wuliucode).find('option:selected').val();
+				location.replace('/manage/iframe/logistics/orderinfo?pageno=1&picicode='+picicode+'&ordercode='+ordercode+'&logisticcode='+logisticcode+'&state='+state+'&ishas='+ishas+'&wuliucode='+wuliucode+'&receiver='+receiver);
+			}
+			function _export(){
+				wuliucode = $('#wl').find('option:selected').val();
+				ishas = $('#ishas option:selected').val();
+				picicode = $('#picicode').val();
+				if($.trim(wuliucode) == "xzwl"){
+					layer.msg('请选择物流',{time : 1000});return;
+				}
+				if($.trim(picicode)==''){
+					layer.msg('请选输入批次',{time : 1000});return;
+				}
+				window.open('/manage/iframe/logistics/exportwuliu/'+wuliucode+'-'+ishas+'-'+picicode, '_blank');
+			}
+			function searchcode(){
+				picicode = $('#picicode').val();
+				ordercode = $('#ordercode').val();
+				logisticcode = $('#logisticcode').val();
+				receiver = encodeURI($.trim($('#receiver').val()));
+				if($.trim(picicode)!=''){
+					picicode = picicode.replace(/(^\s*)|(\s*$)/g,'');
+					reg = /^[0-9]{1,8}$/;;
+					if(!reg.test(picicode)){
+						layer.tips('请输入正确格式','#picicode', {tips: [1, '#34495E']});return;
+					}
+				}
+				if($.trim(ordercode)!=''){
+					ordercode = ordercode.replace(/(^\s*)|(\s*$)/g,'');
+					reg = /^[0-9]{1,17}$/;
+					if(!reg.test(ordercode)){
+						layer.tips('请输入正确格式', '#ordercode', {tips: [1, '#34495E']});return;
+					}
+				}
+				if($.trim(logisticcode)!=''){
+					logisticcode = logisticcode.replace(/(^\s*)|(\s*$)/g,'');
+					reg = /^[a-zA-Z0-9]{1,30}$/;
+					if(!reg.test(logisticcode)){
+						layer.tips('请输入正确格式', '#logisticcode', {tips: [1, '#34495E']});return;
+					}
+				}
+				location.replace('/manage/iframe/logistics/orderinfo?pageno=1&picicode='+picicode+'&ordercode='+ordercode+'&logisticcode='+logisticcode+'&state='+state+'&ishas='+ishas+'&wuliucode='+wuliucode+'&receiver='+receiver);				
+			}
+			// 打印
+			function print(){
+				parent.print_show('打印详情','/manage/iframe/logistics/printlist','10.5cm','14.6cm');
+			}
+		</script> 
+	</body>
+</html>

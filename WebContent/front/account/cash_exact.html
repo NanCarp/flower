@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="renderer" content="webkit|ie-comp|ie-stand">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+		<meta http-equiv="Cache-Control" content="no-siteapp" />
+		<meta name="format-detection" content="telephone=no" />
+		<link rel="stylesheet" type="text/css" href="/resource/flower/css/flower.account.css" />
+		<style type="text/css">
+			body{
+				background-image: url('/resource/flower/image/cash_get.jpg');
+				background-size: cover;
+				background-repeat: no-repeat;
+				background-color: #E76486;
+			}
+			.container span{
+				position: absolute;
+				width: 140px;
+				height: 36px;
+				border: 2px solid #fff;
+				border-radius: 8px; 	   
+				left: 50%;
+				margin-left: -70px;
+				margin-top: 92%;
+				text-align: center;
+				color: #fff;
+				line-height: 36px;
+				font: 22px/36px 'Microsoft Yahei';
+				font-weight: bolder;
+			}
+		</style>
+		<script type="text/javascript" src="/resource/flower/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/resource/layer/layer.js"></script>
+		<title>鲜花体验卡</title>
+		<script type="text/javascript">
+		 function getCash(){
+			 var type = ${type!};
+			 var load = layer.load();
+			 $.post('/account/getcashexact', {'type':type}, function(data){
+				layer.close(load);
+				if(data.result){
+					layer.msg(data.msg,{time:2000},function(){
+						$.get('/weixin/sendinfocash/'+data.aid, function(data){});
+					});
+				}else{
+					layer.msg(data.msg,{time:2000});
+				}
+			 });
+		 }
+		</script>
+	</head>
+	<body>
+		<div class="container">
+			<span onclick="getCash()">领取</span>
+		</div>
+	</body>
+</html>

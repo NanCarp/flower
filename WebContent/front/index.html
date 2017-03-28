@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="renderer" content="webkit|ie-comp|ie-stand">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+		<meta http-equiv="Cache-Control" content="no-siteapp" />
+		<link rel="stylesheet" type="text/css" href="/resource/flower/css/flower.css" />
+		<script type="text/javascript" src="/resource/flower/js/jquery.min.js"></script>
+		<title>花美美</title>
+	</head>
+	<body>
+		<div class="container">
+			<div class="cell_1">
+				<img src="/resource/flower/image/upload/001.png" />
+			</div>
+			<div class="cell_wz">
+				<span class="cell_wz_1">多品鲜花订阅</span>
+				<span class="cell_wz_2">Mixed flowers subscription</span>
+			</div>
+			<div class="cell_2">
+				<img src="/resource/flower/image/upload/002.png" />
+				<div class="cell_2_1">
+					<span class="price">&yen;${flower2.price?string('0.00')}</span>
+					<span class="desc">精选3-5种当季花材&#12288;让你亲手搭配自己的心情<br>每周一次，共4次&#12288;花束随机派送</span>
+				</div>
+				<div class="cell_2_2">
+					<a href="/product/2">去购买</a>
+				</div>
+			</div>
+			<div class="cell_wz">
+				<span class="cell_wz_1">双品鲜花订阅</span>
+				<span class="cell_wz_2">Item flowers subscription</span>
+			</div>
+			<div class="cell_2">
+				<img src="/resource/flower/image/upload/003.png" />
+				<div class="cell_2_1">
+					<span class="price">&yen;${flower1.price?string('0.00')}</span>
+					<span class="desc">精选3-5种当季花材&#12288;让你亲手搭配自己的心情<br>每周一次，共4次&#12288;花束随机派送</span>
+				</div>
+				<div class="cell_2_2">
+					<a href="/product/1">去购买</a>
+				</div>
+			</div>
+			<div class="cell_wz">
+				<span class="cell_wz_1">花边好物</span>
+				<span class="cell_wz_2">Lace is good things</span>
+			</div>
+			<div class="cell_2">
+				<img src="/resource/flower/image/upload/004.png" />
+				<div class="cell_2_1">
+					<span class="price"><#if aroundlist?size gt 0>&yen;${aroundlist[0].price?string('0.00')}<#else>暂无产品</#if></span>
+					<span class="desc">精选3-5种当季花材&#12288;让你亲手搭配自己的心情<br>每周一次，共4次&#12288;花束随机派送</span>
+				</div>
+				<div class="cell_2_2">
+					<a href="/around">去购买</a>
+				</div>
+			</div>
+			<div class="cell_footer">
+				<span>&copy;2016&#12288;花美美&nbsp;|&nbsp;苏ICP备16055270号</span>
+				<span>技术支撑：江苏品德网络科技有限公司</span>
+			</div>
+		</div>
+	</body>
+</html>

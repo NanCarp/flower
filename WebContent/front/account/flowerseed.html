@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="renderer" content="webkit|ie-comp|ie-stand">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+		<meta http-equiv="Cache-Control" content="no-siteapp" />
+		<meta name="format-detection" content="telephone=no" />
+		<link rel="stylesheet" type="text/css" href="/resource/flower/css/flower.account.css" />
+		<script type="text/javascript" src="/resource/flower/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/resource/layer/layer.js"></script>
+		<script type="text/javascript" src="/resource/flower/js/flower.js"></script>
+		<title>我的种植花束</title>
+		<style type="text/css">
+			.flowerseed_4{
+				width: 100%;
+				height: 40px;
+				float: left;
+				margin: 10px 0 60px;
+			}
+			.flowerseed_button{
+				width: calc(100% - 30px);
+				height: 40px;
+			    display: block;
+			    margin: 0 auto;
+			    font-size: 15px;
+			    line-height: 40px;
+			    text-align: center;
+			    background-color: #E96388;
+			    border-radius: 4px;
+			    color: white;
+			    text-decoration: none;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="flowerseed_1">
+				<img src="/resource/flower/image/023.png" />
+				<div class="flowerseed_1_a"><img src="${account.headimg!}" /></div>
+				<div class="flowerseed_1_b">
+					<p class="fs_nick">${account.nick!}</p>
+					<p class="fs_seed">
+						<span>花束：</span>
+						<span><#if seedcount['c'] gt 0><#list 1..seedcount['c'] as x><img src="/resource/flower/image/send_c.png"></#list></#if></span>
+						<i style="font: 13px/22px 'Microsoft Yahei';margin-left: 5px;" id="huashu">x${seedcount['c']}</i>
+					</p>
+					<p class="fs_seed">
+						<span>花苗：</span>
+						<span><#if seedcount['b'] gt 0><#list 1..seedcount['b'] as x><img src="/resource/flower/image/send_b.png"></#list></#if></span>
+						<i style="font: 13px/22px 'Microsoft Yahei';margin-left: 5px;" id="huanmiao">x${seedcount['b']}</i>
+					</p>
+					<p class="fs_seed">
+						<span>花籽：</span>
+						<span><#if seedcount['a'] gt 0><#list 1..seedcount['a'] as x><img src="/resource/flower/image/send_a.png"></#list></#if></span>
+						<i style="font: 13px/22px 'Microsoft Yahei';margin-left: 5px;" id="huazi">x${seedcount['a']}</i>
+					</p>
+					<p class="fs_progressbar">
+						<span class="jingdu_a" style="width: ${(seedcount['a']/10)?string("percent")}"></span>
+						<span class="jingdu_b" style="width: ${(seedcount['b']/10)?string("percent")}"></span>
+					</p>
+					<p class="fs_info">距离花苗还差${10-seedcount['a']}个花籽</p>
+				</div>
+			</div>
+			<p class="flowerseed_2">用法以及规则</p>
+			<div class="flowerseed_3">
+				<label>1.花籽兑换额度</label>
+				<span>1粒花籽 = 1元人民币。</span>
+				<span>1支花苗 = 10粒花籽 = 10元人民币。</span>
+				<span>双品花束 = 4 支花苗 = 39粒花籽。</span>
+				<span>多品花束 = 6支花苗 = 59粒花籽。</span>
+				<label>2.花籽产生渠道</label>
+				<span>1）关注花美美公众号直接获得 2 粒花籽。</span>
+				<span>2）下单后在订单审核成功后可获得 2 粒花籽。</span>
+				<span>3）邀请好友并下单可获得 2 粒花籽。</span>
+				<span>4）绑定手机即可获得 2 粒花籽。</span>
+				<span>5）签到获花籽：连续签到 10 天，每天获得 1 粒花籽，10天即可获得 1 支花苗。</span>
+				<label>3.花籽使用规则：</label>
+				<span>1）每增长至 10 粒花籽，系统自动显示一支花苗，每增长至 4 支花苗后，系统自动显示一束双品鲜花，每增长 6 支花苗后，系统自动显示一束多品花束。</span>
+				<span>2）待用户积累至双品花束或多品花束的时候，系统会自动提醒用户配送时间和地点。</span>
+				<span>3）花籽使用期限为 2 个月，每一粒领到的花籽超过 2 个月将自动腐烂，不能使用。</span>
+			</div>
+			<div class="flowerseed_4">
+			    <a class="flowerseed_button" href="/account/flowersubs">兑换花束</a>
+			</div>
+		</div>
+	</body>
+</html>
